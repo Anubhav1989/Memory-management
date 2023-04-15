@@ -1,0 +1,134 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+
+#define MEMORY_SIZE 100 // Total size of memory
+#define NUM_PROCESSES 5 // Number of processes
+#define SIMULATION_TIME 3 // Simulation time in time units
+
+typedef struct Process {
+    int pid; // Process ID
+    int size; // Size of the process
+} Process;
+
+typedef struct MemoryBlock {
+    int start; // Starting address of the block
+    int size; // Size of the block
+    bool allocated; // Flag to indicate if the block is allocated or not
+} MemoryBlock;
+
+MemoryBlock memory[MEMORY_SIZE]; // Memory array
+int num_processes = 0; // Number of processes
+int num_blocks = 1; // Number of memory blocks
+int fragmentation = 0; // Total fragmentation
+int wasted_blocks = 0; // Total wasted memory blocks
+
+// Function to initialize the memory
+void initialize_memory() {
+    memory[0].start = 0;
+    memory[0].size = MEMORY_SIZE;
+    memory[0].allocated = false;
+}
+
+// Function to allocate memory to a process using First-Fit algorithm
+void allocate_memory(Process* process) {
+    bool allocated = false;
+    for (int i = 0; i < num_blocks; i++) {
+        if (!memory[i].allocated && memory[i].size >= process->size) {
+            memory[i].allocated = true;
+            memory[i].size -= process->size;
+            memory[num_blocks].start = memory[i].start + process->size;
+            memory[num_blocks].size = memory[i].size;
+            memory[num_blocks].allocated = false;
+            num_blocks++;
+            allocated = true;
+            break;
+        }
+    }
+    if (!allocated) {
+        printf("Memory allocation failed for Process ID: %d\n", process->pid);
+        wasted_blocks++;
+    }
+}
+
+// Function to deallocate memory occupied by a process
+void deallocate_memory(Process* process) {
+    for (int i = 0; i < num_blocks; i++) {
+        if (memory[i].start == process->pid) {
+            memory[i].allocated = false;
+            memory[i].size += process->size;
+            if (i > 0 && !memory[i-1].allocated) {
+                memory[i-1].size += memory[i].size;
+                for (int j = i; j < num_blocks - 1; j++) {
+                    memory[j] = memory[j+1];
+                }
+                num_blocks--;
+                i--;
+            }
+            if (i < num_blocks - 1 && !memory[i+1].allocated) {
+                memory[i].size += memory[i+1].size;
+                for (int j = i + 1; j < num_blocks - 1; j++) {
+                    memory[j] = memory[j+1];
+                }
+                num_blocks--;
+            }
+            break;
+        }
+    }
+}
+
+// Function to display the current state of memory
+void display_memory() {
+    printf("Memory Status:\n");
+    for (int i = 0; i < num_blocks; i++) {
+        printf("Block %d: Start Address = %d, Size = %d, Allocated = %s\n", i + 1, memory[i].start, memory[i].size, memory[i].allocated ? "Yes" : "No");
+    }
+    printf("Fragmentation: %d\n", fragmentation);
+    printf("Wasted Blocks: %d\n", wasted_blocks);
+}
+
+int main() {
+    initialize_memory(); // Initialize memory
+
+    Process processes[NUM_PROCESSES]; // Array to store processes
+
+    // Generate random processes with random sizes
+    for (int i = 0; i < NUM_PROCESSES; i++) {
+        processes[i].pid = i + 1;
+        processes[i].size = rand() % (MEMORY_SIZE / 4) + 1; // Random size between 1 and 25% of total memory
+        num_processes++;
+    }
+
+    // Run simulation for specified time units
+    for (int time = 1; time <= SIMULATION_TIME; time++) {
+        printf("Time Unit: %d\n", time);
+
+        // Allocate memory for each process
+        for (int i = 0; i < num_processes; i++) {
+            printf("Allocating memory for Process ID: %d, Size: %d\n", processes[i].pid, processes[i].size);
+            allocate_memory(&processes[i]); // Allocate memory
+        }
+
+        display_memory(); // Display memory status
+
+        // Deallocate memory for completed processes
+        for (int i = 0; i < num_processes; i++) {
+            if (rand() % 2 == 0) { // Randomly deallocate memory for half of the processes
+                printf("Deallocating memory for Process ID: %d, Size: %d\n", processes[i].pid, processes[i].size);
+                deallocate_memory(&processes[i]); // Deallocate memory
+            }
+        }
+
+        display_memory(); // Display memory status
+
+        fragmentation += num_blocks - 1; // Update fragmentation
+
+        printf("\n");
+    }
+
+    printf("Simulation completed!\n");
+    printf("Average Fragmentation: %.2f\n", (float)fragmentation / SIMULATION_TIME); // Calculate average fragmentation
+    printf("Total Wasted Blocks: %d\n", wasted_blocks); // Display total wasted memory blocks
+
+    return 0;
+}
